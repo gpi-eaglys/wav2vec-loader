@@ -1,5 +1,5 @@
 """
-This script does something.
+Multiprocess dataloader for audio data.
 """
 import logging
 import os
@@ -11,12 +11,11 @@ import datetime
 
 import torch
 import gi
-import math
 
 
 LOG = logging.getLogger(__name__)
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
-DATA_DIR = os.path.join(SCRIPT_DIR, "..", "data")
+DATA_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "data"))
 
 
 def organize_cv_mp3():
@@ -111,6 +110,8 @@ class Collator:
         self.pad_lab = -100
         self.pad_audio = 0
         self.pad_mask = 0
+        # TODO: pre-allocate matrices in __init__
+        # TODO: get max sizes for audio and for labels => possible
 
     def collate(self, batch: List[Dict]):
         tensors = [d["samples"] for d in batch]
@@ -159,7 +160,7 @@ if __name__ == '__main__':
     dev()
 
 # Data
-# batch_size=10, num_workers=1   0:02:27.701387
+# batch_size=10, num_workers=1   0:02:27.701387  100%
 # batch_size=10, num_workers=8   0:00:34.696862
 # batch_size=10, num_workers=10  0:00:29.392929
 # batch_size=10, num_workers=12  0:00:19.622114
