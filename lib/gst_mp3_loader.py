@@ -1,11 +1,10 @@
 """
-This script does something.
+GStreamer-based loading of mp3 audio and converting it to PCM and to torch tensor.
 """
 import os
 import logging
 import gi
 import torch
-import numpy as np
 gi.require_version('Gst', '1.0')
 from gi.repository import Gst
 
@@ -15,10 +14,10 @@ SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 class Mp3ToTensor:
     """
-    Sample code to show how to convert mp3 audio to torch tensor using gstreamer pipeline.
-
     Command line equivalent of:
-        gst-launch-1.0 -e filesrc location=in.mp3 ! decodebin ! audioconvert ! audioresample ! audio/x-raw, rate=16000, channels=1, format=S16LE ! wavenc ! torchsink
+        gst-launch-1.0 -e filesrc location=in.mp3 ! decodebin ! audioconvert ! audioresample ! audio/x-raw, rate=16000, channels=1, format=S16LE ! wavenc ! appsink
+
+    Where 'appsink' is a custom element collecting PCM data into a bytearray.
 
     Features:
     - builds and links elements manually
@@ -146,4 +145,3 @@ class Mp3ToTensor:
 
         LOG.debug(f"Done: {mp3_file} ({self._buff_off:,} bytes)")
         return tensor
-

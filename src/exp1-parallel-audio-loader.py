@@ -18,7 +18,7 @@ DATA_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "data"))
 
 class AudioData:
     def __init__(self, uid: str = None, path: str = None):
-        self.uid = None
+        self.uid = uid
         self.path = path
         self.samples = None
 
@@ -52,6 +52,7 @@ class AudioDataLoader(torch.utils.data.IterableDataset):
                 loader._data.append(AudioData(uid=uid, path=loader._fun_uid2path(uid)))
         LOG.debug(f"audio provider={loader.id} size={len(loader._data)}")
 
+        # each worker has its instance of GStreamer processor
         loader.gst_pipeline = Mp3ToTensor()
 
 
@@ -89,21 +90,20 @@ class AudioDataLoader(torch.utils.data.IterableDataset):
 
 class Collator:
     """
-    Runs on same process as data loader worker.
+    Runs on the same process as the data loader worker.
     Collates data from a single loader.
 
+    Expected input for wav2vec2
     ['input_values', 'attention_mask', 'labels']
 
-    pad (labels) -100
-    pad (input_values) 0
-    pad(attention_mask) 0 (vs 1)
+    pad for labels      :-100
+    pad for input_values:   0
+    pad for attention_mask: 0 (vs 1)
     """
     def __init__(self):
         self.pad_lab = -100
         self.pad_audio = 0
         self.pad_mask = 0
-        # TODO: pre-allocate matrices in __init__
-        # TODO: get max sizes for audio and for labels => possible
 
     def collate(self, batch: List[Dict]):
         tensors = [d["samples"] for d in batch]
@@ -112,6 +112,9 @@ class Collator:
         # allocate 2D
         mat_samples = torch.full((len(batch), max_len), fill_value=self.pad_audio, dtype=tensors[0].dtype)
         mat_mask =  torch.full((len(batch), max_len), fill_value=self.pad_mask, dtype=tensors[0].dtype)
+        # TODO: pre-allocate matrices in __init__
+        # TODO: get max sizes for audio and for labels => possible
+
         # fill in
         for idx, tensor in enumerate(tensors):
             mat_samples[idx, :tensor.shape[0]] = tensor
@@ -147,7 +150,7 @@ def test_tensor_loader(batch_size=4, num_workers=3) -> None:
     for batch in data_loader:
         n_batch += 1
         n_sample_in_batch = batch["input_values"].shape[0]
-        n_sample += n_sample_in_batch 
+        n_sample += n_sample_in_batch
         LOG.debug(f"batch {n_batch:3d}. size={n_sample_in_batch}")
 
     t1 = datetime.datetime.now()
