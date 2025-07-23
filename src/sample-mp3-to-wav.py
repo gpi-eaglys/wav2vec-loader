@@ -6,7 +6,7 @@ import os
 
 import gi
 gi.require_version('Gst', '1.0')
-from gi.repository import Gst, GLib
+from gi.repository import Gst
 
 
 LOG = logging.getLogger(__name__)
@@ -26,22 +26,23 @@ class Mp3ToWavConverter:
     - demonstrates how to re-use the same pipeline
     """
     def __init__(self):
+        Gst.init()
         self.pipeline = Gst.Pipeline.new("converter")
 
-        self._el_filesrc = Gst.ElementFactory.make("filesrc", "src")
+        self._elem_filesrc = Gst.ElementFactory.make("filesrc", "src")
 
-        self._el_dec = Gst.ElementFactory.make("decodebin", name="decodebin")
-        self._el_conv = Gst.ElementFactory.make("audioconvert")
-        self._el_resample = Gst.ElementFactory.make("audioresample")
+        self._elem_dec = Gst.ElementFactory.make("decodebin", name="decodebin")
+        self._elem_conv = Gst.ElementFactory.make("audioconvert")
+        self._elem_resample = Gst.ElementFactory.make("audioresample")
         # set caps for audio format
-        self._el_caps = Gst.ElementFactory.make("capsfilter", "caps")
-        self._el_caps.set_property("caps", Gst.Caps.from_string("audio/x-raw, rate=16000, channels=1, format=S16LE"))
+        self._elem_caps = Gst.ElementFactory.make("capsfilter", "caps")
+        self._elem_caps.set_property("caps", Gst.Caps.from_string("audio/x-raw, rate=16000, channels=1, format=S16LE"))
         # dump
-        self._el_wavenc = Gst.ElementFactory.make("wavenc")
-        self._el_sink = Gst.ElementFactory.make("filesink")
+        self._elem_wavenc = Gst.ElementFactory.make("wavenc")
+        self._elem_sink = Gst.ElementFactory.make("filesink")
 
         # build pipeline
-        elems = [self._el_filesrc, self._el_dec, self._el_conv, self._el_resample, self._el_caps, self._el_wavenc, self._el_sink]
+        elems = [self._elem_filesrc, self._elem_dec, self._elem_conv, self._elem_resample, self._elem_caps, self._elem_wavenc, self._elem_sink]
         for elem in elems:
             if not elem:
                 raise Exception("Failed to create GStreamer element.")
@@ -65,8 +66,8 @@ class Mp3ToWavConverter:
 
     def convert(self, in_mp3, out_wav):
         # Set input/output locations:
-        self._el_filesrc.set_property("location", in_mp3)
-        self._el_sink.set_property("location", out_wav)
+        self._elem_filesrc.set_property("location", in_mp3)
+        self._elem_sink.set_property("location", out_wav)
 
         # Reset pipeline -> rebuilds dynamic pads
         # self.pipeline.set_state(Gst.State.NULL)
@@ -120,7 +121,6 @@ def test_batch():
     """
     Converts all mp3 files in 'data' dir to wav file in 'build' dir
     """
-    Gst.init()
     outdir = os.path.join(REPO_DIR, "build", "wav")
     # create output dirs in advance
     for i in range(256):
