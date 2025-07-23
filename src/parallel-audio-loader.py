@@ -8,9 +8,12 @@ import random
 import shutil
 from typing import Callable, List, Dict
 import datetime
+import numpy as np
 
 import torch
 import gi
+gi.require_version('Gst', '1.0')
+from gi.repository import Gst, GLib
 
 
 LOG = logging.getLogger(__name__)
@@ -46,6 +49,21 @@ def import_gst():
     Gst.init(None)
     print("GStreamer version:", Gst.version_string())
 
+
+class GstPipeline:
+    def __init__(self, pipe):
+        self.pipe_str = pipe
+        self.pipe = Gst.parse_launch(self.pipe_str)
+
+    def init(self):
+        input_pipeline_bus = self.get_bus()
+        input_pipeline_bus.add_signal_watch()
+        input_pipeline_bus.connect("message", AudioDataProvider._gst_on_msg, loop, src)
+
+    def teardown(self):
+        self.pipe
+
+
 class AudioData:
     def __init__(self, uid: str = None, path: str = None):
         self.uid = None
@@ -54,6 +72,22 @@ class AudioData:
 
 
 class AudioDataProvider(torch.utils.data.IterableDataset):
+    """
+    Caching
+    (1) mp3 -> pcm
+       - pipeline: 'gst mp3_to_wav'
+       - input:  .mp3 file
+       - output:  raw audio (bytes)
+
+    (2) Augmentation
+
+    (3)
+
+
+    iter:   iterates over
+
+
+    """
     @staticmethod
     def init(worker_id):
         worker_info = torch.utils.data.get_worker_info()
@@ -85,6 +119,69 @@ class AudioDataProvider(torch.utils.data.IterableDataset):
                 if line == "":
                     continue
                 self._uids.append(line)
+
+        self._gst_pipelines = {
+            "mp3_to_pcm": "filesrc location={}  ! decodebin ! audioconvert ! audioresample !  audio/x-raw, rate=16000, channels=1, format=S16LE ! wavenc ! appsink name=sink",
+            "mp3_to_pcm": "appsrc name=src ! ",
+        }
+
+    def _gst_on_sample(self, sink, src):
+        sample = sink.emit('pull-sample')
+        inp_buf = sample.get_buffer()
+        result, map_info = inp_buf.map(Gst.MapFlags.READ)
+        if result:
+            # 映像フレーム取得
+            frame_bgr = np.ndarray(shape=(), dtype=np.int16, buffer=map_info.data)
+        return Gst.FlowReturn.OK
+
+    @staticmethod
+    def _gst_on_msg(bus, message, loop, src):
+        t = message.type
+        src_name = message.src.get_name()
+        if t == Gst.MessageType.EOS:
+            print(f"{src_name} received End-Of-Stream")
+        if src_name == "input_pipeline":
+            src.emit('end-of-stream')
+        elif src_name == "output_pipeline":
+            loop.quit()
+
+    def _gst_teardown(self):
+
+    def setup(self):
+        gst_pipeline_in = Gst.parse_launch(self._gst_pipelines["mp3_to_pcm"])
+        gst_pipeline_out = Gst.parse_launch(self._gst_pipelines["mp3_to_pcm"])
+
+        src = gst_pipeline_out.get_by_name("src")
+        sink = gst_pipeline_in.get_by_name("sink")
+
+        sink.set_property("emit-signals", True)
+        sink.connect("new-sample", self._gst_on_sample, src)
+
+        loop = GLib.MainLoop()
+
+        # for pipe_name, pipe_str in self._gst_pipelines.items():
+
+        input_pipeline.set_name("input_pipeline")
+
+        # バスの設定
+        input_pipeline_bus = gst_pipeline_in.get_bus()
+        input_pipeline_bus.add_signal_watch()
+        input_pipeline_bus.connect("message", AudioDataProvider._gst_on_msg, loop, src)
+        output_pipeline_bus = gst_pipeline_out.get_bus()
+        output_pipeline_bus.add_signal_watch()
+        output_pipeline_bus.connect("message", AudioDataProvider._gst_on_msg, loop, src)
+
+        # start pipelines
+        gst_pipeline_in.set_state(Gst.State.PLAYING)
+        gst_pipeline_out.set_state(Gst.State.PLAYING)
+
+        try:
+            loop.run()
+        except KeyboardInterrupt:
+            pass
+        # パイプラインを停止
+        gst_pipeline_in.set_state(Gst.State.NULL)
+        gst_pipeline_out.set_state(Gst.State.NULL)
 
 
     def __iter__(self):
