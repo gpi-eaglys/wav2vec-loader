@@ -3,8 +3,9 @@ GStreamer-based loading of mp3 audio and converting it to PCM and to torch tenso
 """
 import os
 import logging
-import gi
 import torch
+# gstreamer
+import gi
 gi.require_version('Gst', '1.0')
 from gi.repository import Gst
 

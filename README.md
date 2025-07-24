@@ -28,8 +28,7 @@ Intermediate goals: \
 
 ### Results
 
-![exp1-boxplot-per-jobs.png](data/pix/exp1-boxplot-per-jobs.png)
-
+![exp1-boxplot-per-jobs.png](docs/pix/exp1-boxplot-per-jobs.png)
 Notes:
 * number of jobs == number of data loader workers
 * process data loading is the slowest
@@ -38,7 +37,7 @@ Notes:
     * hm, how about physcial cores -1? 
   * but the optimal number of workers depends on several other factors -> try and experiment
 
-![exp1-boxplot-per-batchsize.png](data/pix/exp1-boxplot-per-batchsize.png)
+![exp1-boxplot-per-batchsize.png](docs/pix/exp1-boxplot-per-batchsize.png)
 
 Notes:
 * variation is rather small
@@ -63,19 +62,27 @@ Notes:
 * both system and Python dependencies must be installed carefully
 * the following setup worked for me (WSL/Ubuntu 24.04)
 ```bash 
-sudo apt  install gstreamer1.0-tools \
+sudo apt install gstreamer1.0-tools \
                   gstreamer1.0-plugins-{base,good,bad,ugly} \
                   gstreamer1.0-libav \
-                  gir1.2-gst-1.0
+                  gir1.2-gtk-3.0 \
+                  gir1.2-gstreamer-1.0 \
+                  libgirepository1.0-dev
 ```
 
+* create/activate virtualenv
 ```bash
 # works
 pip install pygobject==3.50.0
 pip install PyGObject-stubs==2.13.0
 
-# fails: pip install pygobject
+# fails: 
+# pip install pygobject
 ```
-
-
+* test in python -> it should throw no error
+```python 
+import gi
+gi.require_version('Gst', '1.0')
+from gi.repository import Gst
+```
 
