@@ -8,8 +8,8 @@ Experimenting with custom data loaders for wav2vec fine-tuning.
   * applying audio agumentation in memory
   * caching data - as much as possible  
   * sensible logging 
-    * not using don't use tqdm 
-    * as a matter of fact: minimizing  stdout usage 
+    * not using tqdm 
+    * in general: minimize print to stdout
 
 * refs
   *  [torch: IterableDataset](https://docs.pytorch.org/docs/stable/data.html#torch.utils.data.IterableDataset)
