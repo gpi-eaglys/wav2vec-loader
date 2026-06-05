@@ -1,14 +1,15 @@
 # Data Loading for Wav2vec model tuning
-Experimenting with custom data loaders for wav2vec fine-tuning. \
-Ultimate goal:  \
-* to speed up training by optimizing data loading
-Intermediate goals: \
-* converting mp3 to PCM in memory (no file IO)
-* applying audio agumentation in memory
-* caching data - as much as possible  
-* sensible logging 
-  * not using don't use tqdm 
-  * as a matter of fact: minimizing  stdout usage 
+Experimenting with custom data loaders for wav2vec fine-tuning.
+
+* Primary goal:
+   * to speed up training by optimizing data loading
+* Secondary goals:
+  * converting mp3 to PCM in memory (no file IO)
+  * applying audio agumentation in memory
+  * caching data - as much as possible  
+  * sensible logging 
+    * not using don't use tqdm 
+    * as a matter of fact: minimizing  stdout usage 
 
 # Experiments 
 
