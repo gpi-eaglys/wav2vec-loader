@@ -20,7 +20,7 @@ class AudioData:
     def __init__(self, uid: str = None, path: str = None):
         self.uid = uid
         self.path = path
-        self.samples = None
+        self.tensor: torch.Tensor = None
 
 
 class AudioDataLoader(torch.utils.data.IterableDataset):
@@ -28,9 +28,7 @@ class AudioDataLoader(torch.utils.data.IterableDataset):
     Caching
     (1) mp3 -> tensor
        - using GST pipeline
-
     (2) Caching
-
     """
     @staticmethod
     def init(worker_id):
@@ -54,13 +52,16 @@ class AudioDataLoader(torch.utils.data.IterableDataset):
 
         # each worker has its instance of GStreamer processor
         loader.gst_pipeline = Mp3ToTensor()
+        # LOG.info("init")
 
-
-    def __init__(self, uid_file: str, uid2path_fun: Callable[[str], str]):
+    def __init__(self, uid_file: str, uid2path_fun: Callable[[str], str], cache: bool = True):
         """
         Called only once, copied to other processes
 
+
         :param uid_file: list of utterance ids
+        :param uid2path_fun:
+        :param cache: use it with 'persistent_workers=True'
         """
         super(AudioDataLoader).__init__()
         self.id = -1
@@ -76,16 +77,20 @@ class AudioDataLoader(torch.utils.data.IterableDataset):
                     continue
                 self._uids.append(line)
         self.gst_pipeline = None  # to be populated in the worker process
+        self.opt_cache = cache
 
 
     def __iter__(self):
+        random.shuffle(self._uids)
         audio: AudioData
+        # LOG.info("Iter")
         for audio in self._data:
-            tensor = self.gst_pipeline.to_tensor(audio.path)
+            if audio.tensor is None or not self.opt_cache:
+                audio.tensor = self.gst_pipeline.to_tensor(audio.path)
             #TODO: read from file, convert, augment
             # time.sleep(1 + random.random()*1)
             size = random.randint(2, 16)
-            yield {"label": audio.uid, "samples": tensor}
+            yield {"label": audio.uid, "samples": audio.tensor}
 
 
 class Collator:
@@ -127,9 +132,7 @@ class Collator:
         }
 
 
-
-
-def test_tensor_loader(batch_size=4, num_workers=3) -> None:
+def test_tensor_loader(batch_size: int = 4, num_workers: int = 3, num_epoch: int = 1, cache: bool = True) -> None:
     """
     Loads 100 audio in parallel
     :return:
@@ -138,32 +141,42 @@ def test_tensor_loader(batch_size=4, num_workers=3) -> None:
 
     collator = Collator()
     data_provider = AudioDataLoader(uid_file=fpath_uid,
-                                      uid2path_fun=lambda x: os.path.join(DATA_DIR, "mp3", f"{x}.mp3"))
+                                      uid2path_fun=lambda x: os.path.join(DATA_DIR, "mp3", f"{x}.mp3"), cache=cache)
 
     t0 = datetime.datetime.now()
     data_loader = torch.utils.data.DataLoader(dataset=data_provider,
                                               batch_size=batch_size, num_workers=num_workers,
                                               worker_init_fn=AudioDataLoader.init,
                                               collate_fn=collator.collate,
+                                              persistent_workers=True, # ! important, otherwise cannot cache
                                               pin_memory=True)
     n_sample, n_batch = 0, 0
-    for batch in data_loader:
-        n_batch += 1
-        n_sample_in_batch = batch["input_values"].shape[0]
-        n_sample += n_sample_in_batch
-        LOG.debug(f"batch {n_batch:3d}. size={n_sample_in_batch}")
+    for epoch in range(num_epoch):
+        for batch in data_loader:
+            n_batch += 1
+            n_sample_in_batch = batch["input_values"].shape[0]
+            n_sample += n_sample_in_batch
+            LOG.debug(f"batch {n_batch:3d}. size={n_sample_in_batch}")
 
     t1 = datetime.datetime.now()
     LOG.info(f"Loaded {n_sample:,} samples in\t{n_batch:,}\tbatches - batch-size\t{batch_size}\tnum_worker\t{num_workers}\t{(t1 - t0).total_seconds()}")
 
 
-def run_exp1():
+def run_bench():
     for batch_size in range(1, 21):
         for num_workers in range(1, 17):
             test_tensor_loader(batch_size=batch_size, num_workers=num_workers)
+
+def run_one():
+    batch_size = 12
+    num_workers = 1
+    num_epoch = 5
+    test_tensor_loader(batch_size=batch_size, num_workers=num_workers, num_epoch=num_epoch, cache=True)
+    test_tensor_loader(batch_size=batch_size, num_workers=num_workers, num_epoch=num_epoch, cache=False)
 
 
 if __name__ == '__main__':
     logging.basicConfig(format="%(asctime)s [PID:%(process)d] [%(levelname)s] %(module)s.%(funcName)s %(message)s", level=logging.INFO)
     #test_tensor_loader(batch_size=4, num_workers=3)
-    run_exp1()
+    # run_bench()
+    run_one()

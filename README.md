@@ -10,6 +10,9 @@ Intermediate goals: \
   * not using don't use tqdm 
   * as a matter of fact: minimizing  stdout usage 
 
+* refs
+  *  [torch: IterableDataset](https://docs.pytorch.org/docs/stable/data.html#torch.utils.data.IterableDataset)
+
 # Experiments 
 
 ## Experiment 1
